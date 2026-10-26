@@ -26,7 +26,7 @@ class DirectoryPicker: NSObject, UIDocumentPickerDelegate {
         if let rootViewController = rootViewController {
             rootViewController.present(documentPicker, animated: true, completion: nil)
         } else {
-            result?(nil)
+            self.result?(nil)
         }
     }
 

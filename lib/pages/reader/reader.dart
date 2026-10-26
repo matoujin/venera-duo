@@ -120,6 +120,7 @@ class _ReaderState extends State<Reader>
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _imageViewController?.toPage(page);
+      if (!mounted) return;
       update();
     });
   }
@@ -543,6 +544,13 @@ abstract mixin class _ImagePerPageHandler {
 
     if (_lastImagesPerPage != currentImagesPerPage ||
         _lastOrientation != currentOrientation) {
+      // Images not loaded yet: maxPage is a stub (1). Skipping remap preserves
+      // the history-restored page across an early fold/unfold.
+      if (images == null) {
+        _lastImagesPerPage = currentImagesPerPage;
+        _lastOrientation = currentOrientation;
+        return;
+      }
       // Calculate old maxPage using old imagesPerPage to correctly determine
       // if we were on the comments page before the orientation change
       int oldMaxPage = _calcMaxPage(_lastImagesPerPage);

@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - 'cursor/**'
   workflow_dispatch: {}
 
 permissions:
@@ -63,7 +64,6 @@ jobs:
           path: result/venera_duo_1.6.3_ios27.1.ipa
 
       - name: Publish Pre-release duo-latest
-        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -71,8 +71,9 @@ jobs:
           IPA="result/venera_duo_1.6.3_ios27.1.ipa"
           # Create or refresh the floating duo-latest pre-release for LiveContainer
           # install-from-URL: .../releases/download/duo-latest/venera_duo_1.6.3_ios27.1.ipa
-          gh release create duo-latest "$IPA" \
+          # `gh release create` has no --clobber; upload first, create if missing.
+          gh release upload duo-latest "$IPA" --clobber \
+          || gh release create duo-latest "$IPA" \
             --title "Venera iPhone Duo (iOS 27.1 Unsigned IPA)" \
             --notes "Unsigned iOS 27.1 SDK (0x001B0100) build for iPhone Duo & LiveContainer" \
-            --prerelease --clobber \
-          || gh release upload duo-latest "$IPA" --clobber
+            --prerelease

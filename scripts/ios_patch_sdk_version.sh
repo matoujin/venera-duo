@@ -50,13 +50,24 @@ data["DTSDKBuild"] = "24A94232"
 data["DTXcode"] = "2710"
 data["DTXcodeBuild"] = "27A9275"
 data["UIDeviceFamily"] = [1, 2]
+data["MinimumOSVersion"] = "16.1"
+# Distinct bundle id so SpringBoard / LiveContainer do not reuse old
+# compatibility-mode state cached under com.github.wgh136.venera.
+data["CFBundleIdentifier"] = "com.github.wgh136.venera.duo"
 
 # Remove full-screen compatibility key entirely (do not leave false).
 data.pop("UIRequiresFullScreen", None)
 
-# Ensure modern launch-screen key for iOS 27+ Duo sizing.
-if "UILaunchScreen" not in data:
-    data["UILaunchScreen"] = {}
+# Legacy launch storyboards / images pin a fixed phone size (e.g. 375×667)
+# and force Duo into the letterboxed compatibility window. Strip them and
+# keep only the modern UILaunchScreen dictionary.
+for key in (
+    "UILaunchStoryboardName",
+    "UILaunchImageFile",
+    "UILaunchImages",
+):
+    data.pop(key, None)
+data["UILaunchScreen"] = {}
 
 _orientations = [
     "UIInterfaceOrientationPortrait",
@@ -78,7 +89,12 @@ with open(path, "wb") as f:
 print(f"Patched {path}")
 PY
 
-echo "==> Patching LC_BUILD_VERSION.sdk -> 27.1.0 (0x001B0100) in Mach-O binaries"
+echo "==> Removing compiled LaunchScreen.storyboardc (legacy fixed size)"
+rm -rf "$APP_PATH/Base.lproj/LaunchScreen.storyboardc"
+# Also drop any loose LaunchScreen leftovers under the app bundle.
+find "$APP_PATH" -name 'LaunchScreen.storyboardc' -type d -prune -exec rm -rf {} + 2>/dev/null || true
+
+echo "==> Patching LC_BUILD_VERSION minos=16.1.0 / sdk=27.1.0 in Mach-O binaries"
 
 python3 - "$APP_PATH" <<'PY'
 """Patch LC_BUILD_VERSION.sdk in thin and FAT Mach-O binaries to 27.1.0.
@@ -97,6 +113,7 @@ import sys
 from pathlib import Path
 
 APP = Path(sys.argv[1])
+TARGET_MINOS = 0x00100100  # 16.1.0
 TARGET_SDK = 0x001B0100  # 27.1.0
 LC_BUILD_VERSION = 0x32
 MH_MAGIC_32 = 0xFEEDFACE
@@ -125,7 +142,7 @@ def is_macho(data: bytes) -> bool:
 
 
 def patch_thin(buf: bytearray, base: int = 0) -> int:
-    """Patch one thin Mach-O slice. Returns count of sdk fields changed."""
+    """Patch one thin Mach-O slice. Returns count of LC_BUILD_VERSION cmds changed."""
     if base + 32 > len(buf):
         return 0
     magic = _magic_le(buf, base)
@@ -151,10 +168,13 @@ def patch_thin(buf: bytearray, base: int = 0) -> int:
             break
         if cmd == LC_BUILD_VERSION and cmdsize >= 24:
             # cmd, cmdsize, platform, minos, sdk, ntools
+            minos_off = offset + 12
             sdk_off = offset + 16
-            old = struct.unpack_from(endian + "I", buf, sdk_off)[0]
+            old_minos = struct.unpack_from(endian + "I", buf, minos_off)[0]
+            old_sdk = struct.unpack_from(endian + "I", buf, sdk_off)[0]
+            struct.pack_into(endian + "I", buf, minos_off, TARGET_MINOS)
             struct.pack_into(endian + "I", buf, sdk_off, TARGET_SDK)
-            if old != TARGET_SDK:
+            if old_minos != TARGET_MINOS or old_sdk != TARGET_SDK:
                 patched += 1
         offset += cmdsize
     return patched
@@ -223,9 +243,12 @@ for p in collect_binaries(APP):
     if n:
         patched_files += 1
         patched_cmds += n
-        print(f"  patched sdk in {p.relative_to(APP)} ({n} LC_BUILD_VERSION)")
+        print(f"  patched minos/sdk in {p.relative_to(APP)} ({n} LC_BUILD_VERSION)")
 
-print(f"Done: {patched_cmds} LC_BUILD_VERSION sdk field(s) in {patched_files} file(s)")
+print(
+    f"Done: {patched_cmds} LC_BUILD_VERSION minos/sdk field(s) "
+    f"in {patched_files} file(s)"
+)
 PY
 
 echo "==> Ad-hoc re-signing frameworks, plugins, and Runner.app"

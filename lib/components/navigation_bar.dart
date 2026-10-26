@@ -197,20 +197,23 @@ class NaviPaneState extends State<NaviPane>
         animation: controller,
         builder: (context, child) {
           final value = controller.value;
+          // Wide/inner: NavigationRail on the RIGHT. Narrow/cover: bottom tabs
+          // (via buildMainView). Offsets use live controller value from window width.
+          final sideExtent =
+              _kFoldedSideBarWidth * ((value - 1).clamp(0, 1)) +
+              (_kSideBarWidth - _kFoldedSideBarWidth) *
+                  ((value - 2).clamp(0, 1));
           Widget content = Stack(
             children: [
+              Positioned.fill(
+                right: sideExtent,
+                child: buildMainView(),
+              ),
               Positioned(
-                left: _kFoldedSideBarWidth * ((value - 2.0).clamp(-1.0, 0.0)),
+                right: _kFoldedSideBarWidth * ((value - 2.0).clamp(-1.0, 0.0)),
                 top: 0,
                 bottom: 0,
                 child: buildLeft(),
-              ),
-              Positioned.fill(
-                left:
-                    _kFoldedSideBarWidth * ((value - 1).clamp(0, 1)) +
-                    (_kSideBarWidth - _kFoldedSideBarWidth) *
-                        ((value - 2).clamp(0, 1)),
-                child: buildMainView(),
               ),
             ],
           );
@@ -337,7 +340,7 @@ class NaviPaneState extends State<NaviPane>
         padding: const EdgeInsets.symmetric(horizontal: paddingHorizontal),
         decoration: BoxDecoration(
           border: Border(
-            right: BorderSide(
+            left: BorderSide(
               color: Theme.of(context).colorScheme.outlineVariant,
               width: 1.0,
             ),
@@ -346,7 +349,7 @@ class NaviPaneState extends State<NaviPane>
         child: Column(
           children: [
             const SizedBox(height: 16),
-            SizedBox(height: MediaQuery.of(context).padding.top),
+            SizedBox(height: MediaQuery.paddingOf(context).top),
             ...List<Widget>.generate(
               widget.paneItems.length,
               (index) => _SideNaviWidget(

@@ -50,7 +50,7 @@ jobs:
           cp -R "$APP" "$BUILD_DIR/Payload/Runner.app"
           bash scripts/ios_patch_sdk_version.sh "$BUILD_DIR/Payload/Runner.app"
           cd "$BUILD_DIR"
-          IPA_NAME="venera_duo_1.6.3_ios27.1.ipa"
+          IPA_NAME="venera_duo_1.6.3-duo2_ios27.1.ipa"
           rm -f "$IPA_NAME"
           zip -r -y "$IPA_NAME" Payload
           mkdir -p "$GITHUB_WORKSPACE/result"
@@ -73,7 +73,7 @@ jobs:
         with:
           name: venera-duo-ios27.1-ipa
           path: |
-            result/venera_duo_1.6.3_ios27.1.ipa
+            result/venera_duo_1.6.3-duo2_ios27.1.ipa
             result/LiveContainer+SideStore_3.8.11_duo_v2.ipa
 
       - name: Publish Pre-release duo-latest
@@ -81,16 +81,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          IPA="result/venera_duo_1.6.3_ios27.1.ipa"
+          IPA="result/venera_duo_1.6.3-duo2_ios27.1.ipa"
           LC_IPA="result/LiveContainer+SideStore_3.8.11_duo_v2.ipa"
           NOTES="$(cat <<'EOF'
           Unsigned iOS 27.1 SDK (0x001B0100) build for iPhone Duo & LiveContainer.
 
+          1.6.3-duo2: wide/inner NavigationRail on the RIGHT; cover keeps bottom tabs.
+
           Assets:
-          - venera_duo_1.6.3_ios27.1.ipa — Venera Duo (install inside LiveContainer)
+          - venera_duo_1.6.3-duo2_ios27.1.ipa — Venera Duo (install inside LiveContainer)
           - LiveContainer+SideStore_3.8.11_duo_v2.ipa — Duo-patched LiveContainer+SideStore host
           EOF
           )"
+          # Drop superseded IPA name so duo-latest stays clean.
+          gh release delete-asset duo-latest venera_duo_1.6.3_ios27.1.ipa -y 2>/dev/null || true
           # Create or refresh the floating duo-latest pre-release.
           # `gh release create` has no --clobber; upload first, create if missing.
           UPLOAD_ARGS=("$IPA")
@@ -102,3 +106,4 @@ jobs:
             --title "Venera iPhone Duo (iOS 27.1 Unsigned IPA)" \
             --notes "$NOTES" \
             --prerelease
+          gh release edit duo-latest --notes "$NOTES" 2>/dev/null || true

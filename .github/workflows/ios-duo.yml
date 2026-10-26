@@ -1,0 +1,109 @@
+name: iOS Duo Unsigned IPA
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - 'cursor/**'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build_ios_duo:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version-file: pubspec.yaml
+          architecture: x64
+
+      - name: Select Xcode
+        run: sudo xcode-select --switch /Applications/Xcode_16.4.app
+
+      - name: Check rust-toolchain.toml
+        run: rustup show
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build iOS release (no codesign)
+        run: flutter build ios --release --no-codesign
+
+      - name: Assemble Payload and patch for iOS 27.1 / Duo
+        run: |
+          set -euo pipefail
+          BUILD_DIR="build/ios/iphoneos"
+          APP="$BUILD_DIR/Runner.app"
+          if [[ ! -d "$APP" ]]; then
+            echo "Runner.app not found under $BUILD_DIR" >&2
+            ls -la "$BUILD_DIR" || true
+            exit 1
+          fi
+          rm -rf "$BUILD_DIR/Payload"
+          mkdir -p "$BUILD_DIR/Payload"
+          cp -R "$APP" "$BUILD_DIR/Payload/Runner.app"
+          bash scripts/ios_patch_sdk_version.sh "$BUILD_DIR/Payload/Runner.app"
+          cd "$BUILD_DIR"
+          IPA_NAME="venera_duo_1.6.3-duo2_ios27.1.ipa"
+          rm -f "$IPA_NAME"
+          zip -r -y "$IPA_NAME" Payload
+          mkdir -p "$GITHUB_WORKSPACE/result"
+          mv "$IPA_NAME" "$GITHUB_WORKSPACE/result/$IPA_NAME"
+          ls -lh "$GITHUB_WORKSPACE/result"
+
+      - name: Stage LiveContainer host IPA
+        run: |
+          set -euo pipefail
+          mkdir -p result
+          if [[ -f release-assets/LiveContainer+SideStore_3.8.11_duo_v2.ipa ]]; then
+            cp -f release-assets/LiveContainer+SideStore_3.8.11_duo_v2.ipa result/
+          else
+            echo "Warning: LiveContainer+SideStore_3.8.11_duo_v2.ipa missing under release-assets/" >&2
+          fi
+          ls -lh result/
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: venera-duo-ios27.1-ipa
+          path: |
+            result/venera_duo_1.6.3-duo2_ios27.1.ipa
+            result/LiveContainer+SideStore_3.8.11_duo_v2.ipa
+
+      - name: Publish Pre-release duo-latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          IPA="result/venera_duo_1.6.3-duo2_ios27.1.ipa"
+          LC_IPA="result/LiveContainer+SideStore_3.8.11_duo_v2.ipa"
+          NOTES="$(cat <<'EOF'
+          Unsigned iOS 27.1 SDK (0x001B0100) build for iPhone Duo & LiveContainer.
+
+          1.6.3-duo2: wide/inner NavigationRail on the RIGHT; cover keeps bottom tabs.
+
+          Assets:
+          - venera_duo_1.6.3-duo2_ios27.1.ipa — Venera Duo (install inside LiveContainer)
+          - LiveContainer+SideStore_3.8.11_duo_v2.ipa — Duo-patched LiveContainer+SideStore host
+          EOF
+          )"
+          # Drop superseded IPA name so duo-latest stays clean.
+          gh release delete-asset duo-latest venera_duo_1.6.3_ios27.1.ipa -y 2>/dev/null || true
+          # Create or refresh the floating duo-latest pre-release.
+          # `gh release create` has no --clobber; upload first, create if missing.
+          UPLOAD_ARGS=("$IPA")
+          if [[ -f "$LC_IPA" ]]; then
+            UPLOAD_ARGS+=("$LC_IPA")
+          fi
+          gh release upload duo-latest "${UPLOAD_ARGS[@]}" --clobber \
+          || gh release create duo-latest "${UPLOAD_ARGS[@]}" \
+            --title "Venera iPhone Duo (iOS 27.1 Unsigned IPA)" \
+            --notes "$NOTES" \
+            --prerelease
+          gh release edit duo-latest --notes "$NOTES" 2>/dev/null || true

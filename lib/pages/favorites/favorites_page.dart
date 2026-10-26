@@ -33,7 +33,9 @@ part 'network_favorites_page.dart';
 
 const _kLeftBarWidth = 256.0;
 
-const _kTwoPanelChangeWidth = 720.0;
+/// Dual-panel (folder list + comics) kicks in at [changePoint] so the iPhone Duo
+/// inner display (~626pt) gets a mid-size two-column layout.
+const _kTwoPanelChangeWidth = changePoint;
 
 class FavoritesPage extends StatefulWidget {
   const FavoritesPage({super.key});

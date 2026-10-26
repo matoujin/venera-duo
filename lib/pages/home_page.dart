@@ -1105,7 +1105,7 @@ class __ChartLineState extends State<_ChartLine>
           )
               .paddingHorizontal(4)
               .toAlign(Alignment.centerLeft)
-              .fixWidth(context.width > 600 ? 120 : 80)
+              .fixWidth(context.width > changePoint ? 120 : 80)
               .fixHeight(double.infinity),
         ),
         const SizedBox(width: 8),
@@ -1141,7 +1141,7 @@ class __ChartLineState extends State<_ChartLine>
         Text(
           widget.count.toString(),
           style: ts.s12,
-        ).fixWidth(context.width > 600 ? 60 : 30),
+        ).fixWidth(context.width > changePoint ? 60 : 30),
       ],
     ).fixHeight(28);
   }

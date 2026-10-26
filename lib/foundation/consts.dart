@@ -1,9 +1,11 @@
-/// If window width is less than this value, it is considered as mobile.
+/// If window width is less than this value, it is considered as mobile
+/// (bottom navigation). Above this, use a side [NavigationRail]-style pane.
+///
+/// Tuned for iPhone Duo: cover display ~466pt → mobile; inner ~626pt → rail.
 const changePoint = 600;
 
-/// If window width is less than this value, it is considered as tablet.
-///
-/// If it is more than this value, it is considered as desktop.
+/// If window width is less than this value, it is considered as tablet
+/// (compact side rail). Above this, it is considered as desktop (expanded rail).
 const changePoint2 = 1300;
 
 /// Default user agent for http requests.

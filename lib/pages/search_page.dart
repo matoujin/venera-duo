@@ -7,6 +7,7 @@ import 'package:venera/components/components.dart';
 import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/appdata.dart';
 import 'package:venera/foundation/comic_source/comic_source.dart';
+import 'package:venera/foundation/consts.dart';
 import 'package:venera/foundation/global_state.dart';
 import 'package:venera/pages/aggregated_search_page.dart';
 import 'package:venera/pages/search_result_page.dart';
@@ -393,7 +394,7 @@ class _SearchPageState extends State<SearchPage> {
       focusNode.requestFocus();
     }
 
-    bool showMethod = MediaQuery.of(context).size.width < 600;
+    bool showMethod = MediaQuery.sizeOf(context).width < changePoint;
     bool showTranslation = App.locale.languageCode == "zh";
     Widget buildItem(Pair<String, TranslationType> value) {
       if (value.left == "**URL**") {

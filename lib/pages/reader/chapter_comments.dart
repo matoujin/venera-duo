@@ -754,8 +754,10 @@ class _EmbeddedChapterCommentsPageState
   }
 
   Widget _buildCommentsList(bool showAvatar) {
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-    final crossAxisCount = isLandscape ? 2 : 1;
+    // Prefer live width over orientation so Duo fold/unfold (both portrait)
+    // still gets a sensible column count on the inner display.
+    final crossAxisCount =
+        MediaQuery.sizeOf(context).width >= changePoint ? 2 : 1;
     final scrollController = ScrollController();
     
     return Scrollbar(

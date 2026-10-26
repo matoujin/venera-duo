@@ -117,6 +117,11 @@ class _ReaderImagesState extends State<_ReaderImages> {
         ),
       );
     } else {
+      // Include live viewport size in keys so fold ↔ unfold remounts the
+      // canvas with correct PhotoView childSize / scroll extents.
+      final viewport = MediaQuery.sizeOf(context);
+      final sizeKey =
+          '${viewport.width.round()}x${viewport.height.round()}';
       if (reader.mode.isGallery) {
         var showComments =
             appdata.settings.getReaderSetting(
@@ -134,11 +139,11 @@ class _ReaderImagesState extends State<_ReaderImages> {
             true;
         return _GalleryMode(
           key: Key(
-            '${reader.mode.key}_${reader.imagesPerPage}_${showComments}_$showCommentsAtEnd',
+            '${reader.mode.key}_${reader.imagesPerPage}_${showComments}_${showCommentsAtEnd}_$sizeKey',
           ),
         );
       } else {
-        return _ContinuousMode(key: Key(reader.mode.key));
+        return _ContinuousMode(key: Key('${reader.mode.key}_$sizeKey'));
       }
     }
   }
@@ -346,7 +351,7 @@ class _GalleryModeState extends State<_GalleryMode>
               );
             }
 
-            final viewportSize = MediaQuery.of(context).size;
+            final viewportSize = MediaQuery.sizeOf(context);
             return PhotoViewGalleryPageOptions.customChild(
               childSize: viewportSize,
               controller: photoViewControllers[index],
@@ -359,7 +364,7 @@ class _GalleryModeState extends State<_GalleryMode>
         pageController: controller,
         loadingBuilder: (context, event) {
           return PhotoView.customChild(
-            childSize: MediaQuery.of(context).size,
+            childSize: MediaQuery.sizeOf(context),
             initialScale: PhotoViewComputedScale.contained,
             minScale: PhotoViewComputedScale.contained * 1.0,
             maxScale: PhotoViewComputedScale.covered * 10.0,
@@ -410,9 +415,14 @@ class _GalleryModeState extends State<_GalleryMode>
   }
 
   Widget buildPageImages(List<String> images, int startIndex) {
+    final viewportWidth = MediaQuery.sizeOf(context).width;
     Axis axis = (reader.mode == ReaderMode.galleryTopToBottom)
         ? Axis.vertical
         : Axis.horizontal;
+    // Duo / wide dual-page spread: side-by-side even in top-to-bottom mode.
+    if (images.length == 2 && viewportWidth >= changePoint) {
+      axis = Axis.horizontal;
+    }
 
     bool reverse = reader.mode == ReaderMode.galleryRightToLeft;
     if (reverse) {
@@ -1084,7 +1094,7 @@ class _ContinuousModeState extends State<_ContinuousMode>
     } else {
       target = photoViewController.getInitialScale!.call()! * 1.75;
     }
-    var size = MediaQuery.of(context).size;
+    var size = MediaQuery.sizeOf(context);
     photoViewController.animateScale?.call(
       target,
       Offset(size.width / 2 - location.dx, size.height / 2 - location.dy),

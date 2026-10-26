@@ -115,6 +115,15 @@ class _ReaderState extends State<Reader>
     setState(() {});
   }
 
+  @override
+  void syncReaderViewAfterImagesPerPageChange() {
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _imageViewController?.toPage(page);
+      update();
+    });
+  }
+
   /// The maximum page number for images only (excluding chapter comments page).
   /// This is used for display purposes and history recording.
   @override
@@ -175,9 +184,30 @@ class _ReaderState extends State<Reader>
   @override
   late ReaderMode mode;
 
+  /// Compact cover / true portrait → true.
+  ///
+  /// iPhone Duo inner display (~626×890pt) reports [Orientation.portrait]
+  /// (`height > width`) but is wide enough for dual-page; treat that as
+  /// non-portrait so [imagesPerPage] uses landscape settings.
   @override
-  bool get isPortrait =>
-      MediaQuery.of(context).orientation == Orientation.portrait;
+  bool get isPortrait {
+    final size = MediaQuery.sizeOf(context);
+    if (_isWideUnfoldedLayout(size)) {
+      return false;
+    }
+    return MediaQuery.orientationOf(context) == Orientation.portrait;
+  }
+
+  /// Duo inner (and similar) layout: width past [changePoint] with a
+  /// near-square aspect (cover ≈0.69, inner ≈0.70).
+  static bool _isWideUnfoldedLayout(Size size) {
+    if (size.height <= 0) return false;
+    return size.width >= changePoint && size.width / size.height >= 0.68;
+  }
+
+  /// Last known viewport size; used to detect Duo fold/unfold without an
+  /// orientation change (cover and inner are both typically portrait).
+  Size? _lastViewportSize;
 
   History? history;
 
@@ -241,9 +271,18 @@ class _ReaderState extends State<Reader>
     if (!_isInitialized) {
       initImagesPerPage(widget.initialPage ?? 1);
       _isInitialized = true;
+      _lastViewportSize = MediaQuery.sizeOf(context);
     } else {
-      // For orientation changed
+      // Orientation and/or fold ↔ unfold size change
       _checkImagesPerPageChange();
+      final size = MediaQuery.sizeOf(context);
+      if (_lastViewportSize != size) {
+        _lastViewportSize = size;
+        // Remount image views with fresh viewport metrics on the next frame.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) update();
+        });
+      }
     }
     initReaderWindow();
   }
@@ -276,6 +315,8 @@ class _ReaderState extends State<Reader>
     autoPageTurningTimer?.cancel();
     focusNode.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    // Always unlock orientations when leaving the reader (foldable / Duo).
+    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     stopVolumeEvent();
     Future.microtask(() {
       DataSync().onDataChanged();
@@ -288,6 +329,8 @@ class _ReaderState extends State<Reader>
   @override
   Widget build(BuildContext context) {
     _checkImagesPerPageChange();
+    // Subscribe to live window size so fold/unfold rebuilds the reader canvas.
+    _lastViewportSize = MediaQuery.sizeOf(context);
     return KeyboardListener(
       focusNode: focusNode,
       autofocus: true,
@@ -430,6 +473,9 @@ abstract mixin class _ImagePerPageHandler {
   String get cid;
 
   ComicType get type;
+
+  /// Sync gallery/continuous controller after fold↔unfold remaps [page].
+  void syncReaderViewAfterImagesPerPageChange();
   
   /// Whether the current page is the chapter comments page
   bool get isOnChapterCommentsPage;
@@ -459,7 +505,10 @@ abstract mixin class _ImagePerPageHandler {
     'showSingleImageOnFirstPage',
   );
 
-  /// The number of images displayed on one screen
+  /// The number of images displayed on one screen.
+  ///
+  /// Uses landscape pic count for true landscape **and** for Duo-style
+  /// unfolded layouts where [isPortrait] is false despite vertical orientation.
   int get imagesPerPage {
     if (mode.isContinuous) return 1;
     if (isPortrait) {
@@ -505,6 +554,9 @@ abstract mixin class _ImagePerPageHandler {
       );
       _lastImagesPerPage = currentImagesPerPage;
       _lastOrientation = currentOrientation;
+      // Keep PhotoViewGallery PageController in sync with remapped page index
+      // after fold ↔ unfold (otherwise it can stick on a stale / OOB index).
+      syncReaderViewAfterImagesPerPageChange();
     }
   }
 

@@ -99,6 +99,9 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
 
   @override
   void dispose() {
+    // Leaving the reader must unlock orientation so fold/unfold and the rest
+    // of the app are not stuck in a locked portrait/landscape.
+    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     sliderFocus.dispose();
     super.dispose();
   }
@@ -414,7 +417,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
             },
           ),
         ),
-      if (App.isAndroid)
+      if (App.isMobile)
         Tooltip(
           message: "Screen Rotation".tl,
           child: IconButton(

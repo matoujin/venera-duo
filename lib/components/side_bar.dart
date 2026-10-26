@@ -72,7 +72,7 @@ class SideBarRoute<T> extends PopupRoute<T> {
   @override
   Widget buildPage(BuildContext context, Animation<double> animation,
       Animation<double> secondaryAnimation) {
-    bool showSideBar = MediaQuery.of(context).size.width > width;
+    bool showSideBar = MediaQuery.sizeOf(context).width > width;
 
     Widget body = widget;
 
@@ -87,7 +87,7 @@ class SideBarRoute<T> extends PopupRoute<T> {
       );
     }
 
-    final sideBarWidth = math.min(width, MediaQuery.of(context).size.width);
+    final sideBarWidth = math.min(width, MediaQuery.sizeOf(context).width);
 
     body = Container(
       decoration: BoxDecoration(
@@ -105,7 +105,7 @@ class SideBarRoute<T> extends PopupRoute<T> {
       ),
       clipBehavior: Clip.antiAlias,
       constraints: BoxConstraints(maxWidth: sideBarWidth),
-      height: MediaQuery.of(context).size.height,
+      height: MediaQuery.sizeOf(context).height,
       child: GestureDetector(
         child: Material(
           child: ClipRect(

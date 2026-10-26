@@ -9,6 +9,7 @@ import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/appdata.dart';
 import 'package:venera/foundation/cache_manager.dart';
 import 'package:venera/foundation/comic_source/comic_source.dart';
+import 'package:venera/foundation/consts.dart';
 import 'package:venera/foundation/favorites.dart';
 import 'package:venera/foundation/js_engine.dart';
 import 'package:venera/foundation/local.dart';
@@ -44,7 +45,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   ColorScheme get colors => Theme.of(context).colorScheme;
 
-  bool get enableTwoViews => context.width > 720;
+  bool get enableTwoViews => context.width > changePoint;
 
   final categories = <String>[
     "Explore",
@@ -72,6 +73,16 @@ class _SettingsPageState extends State<SettingsPage> {
   void initState() {
     currentPage = widget.initialPage;
     super.initState();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Duo inner (~626pt) enables two-pane; default to first category so the
+    // right pane is not left blank when currentPage is still -1.
+    if (enableTwoViews && currentPage == -1) {
+      currentPage = 0;
+    }
   }
 
   @override

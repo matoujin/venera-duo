@@ -1,0 +1,78 @@
+name: iOS Duo Unsigned IPA
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build_ios_duo:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version-file: pubspec.yaml
+          architecture: x64
+
+      - name: Select Xcode
+        run: sudo xcode-select --switch /Applications/Xcode_16.4.app
+
+      - name: Check rust-toolchain.toml
+        run: rustup show
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build iOS release (no codesign)
+        run: flutter build ios --release --no-codesign
+
+      - name: Assemble Payload and patch for iOS 27.1 / Duo
+        run: |
+          set -euo pipefail
+          BUILD_DIR="build/ios/iphoneos"
+          APP="$BUILD_DIR/Runner.app"
+          if [[ ! -d "$APP" ]]; then
+            echo "Runner.app not found under $BUILD_DIR" >&2
+            ls -la "$BUILD_DIR" || true
+            exit 1
+          fi
+          rm -rf "$BUILD_DIR/Payload"
+          mkdir -p "$BUILD_DIR/Payload"
+          cp -R "$APP" "$BUILD_DIR/Payload/Runner.app"
+          bash scripts/ios_patch_sdk_version.sh "$BUILD_DIR/Payload/Runner.app"
+          cd "$BUILD_DIR"
+          IPA_NAME="venera_duo_1.6.3_ios27.1.ipa"
+          rm -f "$IPA_NAME"
+          zip -r -y "$IPA_NAME" Payload
+          mkdir -p "$GITHUB_WORKSPACE/result"
+          mv "$IPA_NAME" "$GITHUB_WORKSPACE/result/$IPA_NAME"
+          ls -lh "$GITHUB_WORKSPACE/result"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: venera-duo-ios27.1-ipa
+          path: result/venera_duo_1.6.3_ios27.1.ipa
+
+      - name: Publish Pre-release duo-latest
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          IPA="result/venera_duo_1.6.3_ios27.1.ipa"
+          # Create or refresh the floating duo-latest pre-release for LiveContainer
+          # install-from-URL: .../releases/download/duo-latest/venera_duo_1.6.3_ios27.1.ipa
+          gh release create duo-latest "$IPA" \
+            --title "Venera iPhone Duo (iOS 27.1 Unsigned IPA)" \
+            --notes "Unsigned iOS 27.1 SDK (0x001B0100) build for iPhone Duo & LiveContainer" \
+            --prerelease --clobber \
+          || gh release upload duo-latest "$IPA" --clobber

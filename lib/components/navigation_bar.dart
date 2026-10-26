@@ -142,8 +142,10 @@ class NaviPaneState extends State<NaviPane>
     super.dispose();
   }
 
+  /// Pick nav chrome from the live window width (not a cold-start cache).
+  /// Duo cover (~466pt) → bottom bar; Duo inner (~626pt) → compact side rail.
   double targetFormContext(BuildContext context) {
-    var width = MediaQuery.of(context).size.width;
+    var width = MediaQuery.sizeOf(context).width;
     double target = 0;
     if (width > changePoint) {
       target = 2;
@@ -175,12 +177,13 @@ class NaviPaneState extends State<NaviPane>
   Widget build(BuildContext context) {
     onRebuild(context);
     final mq = MediaQuery.of(context);
-    final sideInsets = (App.isMobile && mq.orientation == Orientation.landscape)
-        ? EdgeInsets.only(
-            left: math.max(mq.viewPadding.left, mq.systemGestureInsets.left),
-            right: math.max(mq.viewPadding.right, mq.systemGestureInsets.right),
-          )
-        : EdgeInsets.zero;
+    // Always honor left/right safe insets (Duo inner status bar / hinge),
+    // not only when Orientation.landscape — fold↔unfold stays portrait.
+    MediaQuery.sizeOf(context);
+    final sideInsets = EdgeInsets.only(
+      left: mq.padding.left,
+      right: mq.padding.right,
+    );
     return _NaviPopScope(
       action: () {
         if (App.mainNavigatorKey!.currentState!.canPop()) {

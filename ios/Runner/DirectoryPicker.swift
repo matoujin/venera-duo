@@ -13,9 +13,20 @@ class DirectoryPicker: NSObject, UIDocumentPickerDelegate {
         documentPicker.delegate = self
         documentPicker.allowsMultipleSelection = false
 
-        // 获取根视图控制器并显示选择器
-        if let rootViewController = UIApplication.shared.keyWindow?.rootViewController {
+        // Prefer active UIWindowScene (UIScene lifecycle), then legacy keyWindow.
+        let rootViewController: UIViewController? = {
+            let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+            let active = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
+            if let root = active?.windows.first(where: { $0.isKeyWindow })?.rootViewController
+                ?? active?.windows.first?.rootViewController {
+                return root
+            }
+            return UIApplication.shared.windows.first?.rootViewController
+        }()
+        if let rootViewController = rootViewController {
             rootViewController.present(documentPicker, animated: true, completion: nil)
+        } else {
+            result?(nil)
         }
     }
 

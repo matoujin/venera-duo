@@ -57,11 +57,24 @@ jobs:
           mv "$IPA_NAME" "$GITHUB_WORKSPACE/result/$IPA_NAME"
           ls -lh "$GITHUB_WORKSPACE/result"
 
+      - name: Stage LiveContainer host IPA
+        run: |
+          set -euo pipefail
+          mkdir -p result
+          if [[ -f release-assets/LiveContainer+SideStore_3.8.11_duo_v2.ipa ]]; then
+            cp -f release-assets/LiveContainer+SideStore_3.8.11_duo_v2.ipa result/
+          else
+            echo "Warning: LiveContainer+SideStore_3.8.11_duo_v2.ipa missing under release-assets/" >&2
+          fi
+          ls -lh result/
+
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: venera-duo-ios27.1-ipa
-          path: result/venera_duo_1.6.3_ios27.1.ipa
+          path: |
+            result/venera_duo_1.6.3_ios27.1.ipa
+            result/LiveContainer+SideStore_3.8.11_duo_v2.ipa
 
       - name: Publish Pre-release duo-latest
         env:
@@ -69,11 +82,23 @@ jobs:
         run: |
           set -euo pipefail
           IPA="result/venera_duo_1.6.3_ios27.1.ipa"
-          # Create or refresh the floating duo-latest pre-release for LiveContainer
-          # install-from-URL: .../releases/download/duo-latest/venera_duo_1.6.3_ios27.1.ipa
+          LC_IPA="result/LiveContainer+SideStore_3.8.11_duo_v2.ipa"
+          NOTES="$(cat <<'EOF'
+          Unsigned iOS 27.1 SDK (0x001B0100) build for iPhone Duo & LiveContainer.
+
+          Assets:
+          - venera_duo_1.6.3_ios27.1.ipa — Venera Duo (install inside LiveContainer)
+          - LiveContainer+SideStore_3.8.11_duo_v2.ipa — Duo-patched LiveContainer+SideStore host
+          EOF
+          )"
+          # Create or refresh the floating duo-latest pre-release.
           # `gh release create` has no --clobber; upload first, create if missing.
-          gh release upload duo-latest "$IPA" --clobber \
-          || gh release create duo-latest "$IPA" \
+          UPLOAD_ARGS=("$IPA")
+          if [[ -f "$LC_IPA" ]]; then
+            UPLOAD_ARGS+=("$LC_IPA")
+          fi
+          gh release upload duo-latest "${UPLOAD_ARGS[@]}" --clobber \
+          || gh release create duo-latest "${UPLOAD_ARGS[@]}" \
             --title "Venera iPhone Duo (iOS 27.1 Unsigned IPA)" \
-            --notes "Unsigned iOS 27.1 SDK (0x001B0100) build for iPhone Duo & LiveContainer" \
+            --notes "$NOTES" \
             --prerelease

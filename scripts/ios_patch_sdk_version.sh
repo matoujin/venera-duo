@@ -79,10 +79,32 @@ data["UISupportedInterfaceOrientations"] = list(_orientations)
 data["UISupportedInterfaceOrientations~iphone"] = list(_orientations)
 data["UISupportedInterfaceOrientations~ipad"] = list(_orientations)
 
+# Ensure UIScene manifest exists for iOS 27.1 + UILaunchScreen. Keep
+# UIApplicationSupportsMultipleScenes = false (must NOT force true).
+_scene_config = {
+    "UISceneClassName": "UIWindowScene",
+    "UISceneConfigurationName": "flutter",
+    "UISceneDelegateClassName": "FlutterSceneDelegate",
+    "UISceneStoryboardFile": "Main",
+}
 manifest = data.get("UIApplicationSceneManifest")
-if isinstance(manifest, dict):
-    manifest["UIApplicationSupportsMultipleScenes"] = True
-    data["UIApplicationSceneManifest"] = manifest
+if not isinstance(manifest, dict):
+    manifest = {}
+manifest["UIApplicationSupportsMultipleScenes"] = False
+configs = manifest.get("UISceneConfigurations")
+if not isinstance(configs, dict):
+    configs = {}
+role = configs.get("UIWindowSceneSessionRoleApplication")
+if not isinstance(role, list) or not role:
+    configs["UIWindowSceneSessionRoleApplication"] = [_scene_config]
+else:
+    # Preserve existing entries but force FlutterSceneDelegate + Main storyboard.
+    first = role[0] if isinstance(role[0], dict) else {}
+    first.update(_scene_config)
+    role[0] = first
+    configs["UIWindowSceneSessionRoleApplication"] = role
+manifest["UISceneConfigurations"] = configs
+data["UIApplicationSceneManifest"] = manifest
 
 with open(path, "wb") as f:
     plistlib.dump(data, f, sort_keys=False)

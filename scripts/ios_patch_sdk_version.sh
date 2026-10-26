@@ -41,14 +41,37 @@ path = sys.argv[1]
 with open(path, "rb") as f:
     data = plistlib.load(f)
 
+# Official iPhoneOS27.1.sdk SDKSettings / Xcode 27.1 build identifiers
 data["DTPlatformName"] = "iphoneos"
 data["DTPlatformVersion"] = "27.1"
+data["DTPlatformBuild"] = "24A94232"
 data["DTSDKName"] = "iphoneos27.1"
-data["DTSDKBuild"] = "25B5062a"
+data["DTSDKBuild"] = "24A94232"
 data["DTXcode"] = "2710"
-data["DTXcodeBuild"] = "27B100"
+data["DTXcodeBuild"] = "27A9275"
 data["UIDeviceFamily"] = [1, 2]
-data["UIRequiresFullScreen"] = False
+
+# Remove full-screen compatibility key entirely (do not leave false).
+data.pop("UIRequiresFullScreen", None)
+
+# Ensure modern launch-screen key for iOS 27+ Duo sizing.
+if "UILaunchScreen" not in data:
+    data["UILaunchScreen"] = {}
+
+_orientations = [
+    "UIInterfaceOrientationPortrait",
+    "UIInterfaceOrientationPortraitUpsideDown",
+    "UIInterfaceOrientationLandscapeLeft",
+    "UIInterfaceOrientationLandscapeRight",
+]
+data["UISupportedInterfaceOrientations"] = list(_orientations)
+data["UISupportedInterfaceOrientations~iphone"] = list(_orientations)
+data["UISupportedInterfaceOrientations~ipad"] = list(_orientations)
+
+manifest = data.get("UIApplicationSceneManifest")
+if isinstance(manifest, dict):
+    manifest["UIApplicationSupportsMultipleScenes"] = True
+    data["UIApplicationSceneManifest"] = manifest
 
 with open(path, "wb") as f:
     plistlib.dump(data, f, sort_keys=False)
